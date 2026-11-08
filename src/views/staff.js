@@ -76,7 +76,7 @@ function searchPage({ user, token, q, hits, attention, stats, tooShort }) {
         : html`<div class="empty"><strong>No match</strong>Check the spelling, or try the last 4 digits of the mobile number.</div>`}</div>` : ''}
       ${!q ? html`
         <div class="grid">
-          <div class="stat"><div class="n">${stats.signedToday}</div><div class="l">Reports signed today</div></div>
+          <div class="stat"><div class="n">${stats.signedToday}</div><div class="l">Reports signed in the last 24 hours</div></div>
           <div class="stat"><div class="n">${stats.failed}</div><div class="l">Delivery failed, needs action</div></div>
           <div class="stat"><div class="n">${stats.callbacks}</div><div class="l">Open critical callbacks</div></div>
         </div>

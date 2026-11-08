@@ -73,6 +73,7 @@ input.code { font-size: 1.75rem; letter-spacing: .4em; text-align: center; font-
 .btn.secondary:hover { background: var(--accent-soft); }
 .btn.quiet { background: transparent; color: var(--muted); border: 0; min-height: 44px; font-weight: 500; text-decoration: underline; }
 .btn.danger { background: var(--bad); }
+.btn.quiet.small { padding-left: 0; justify-content: flex-start; }
 .btn.small { min-height: 40px; padding: 6px 14px; width: auto; font-size: .9rem; }
 .actions { display: grid; gap: 10px; margin-top: 1.25rem; }
 .inline-form { display: inline; }

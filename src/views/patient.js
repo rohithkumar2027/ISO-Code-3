@@ -71,7 +71,7 @@ function reportsPage({ lang, csrf, people, notice }) {
         ${people.length > 1 ? html`<h2 class="person">${p.name}</h2>` : html`<div class="lede">${p.name}</div>`}
         ${p.orders.map((o) => html`<article class="card order">
           <div class="row"><span class="id">${o.id}</span>${statusPill(lang, o.status)}</div>
-          <div class="meta">${o.status === 'processing' ? '' : t(lang, 'signed_on', { d: istDate(o.signed_at) })}${o.referring_doctor ? html` · ${o.referring_doctor}` : ''}</div>
+          <div class="meta">${[o.status === 'processing' ? null : t(lang, 'signed_on', { d: istDate(o.signed_at) }), o.referring_doctor].filter(Boolean).join(' · ')}</div>
           ${o.status === 'ready_critical' ? html`<p class="small"><strong>! ${t(lang, 'critical_note')}</strong></p>` : ''}
           ${o.status === 'processing' ? '' : html`<a class="btn" href="/reports/${o.id}">${t(lang, 'view_report')}</a>`}
         </article>`)}`)}`,

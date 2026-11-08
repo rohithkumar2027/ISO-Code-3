@@ -7,6 +7,19 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { hashPassword } = require('../lib/crypto');
 
+// The sample CSVs carry fixed dates (2026-11-06..08). In demo mode they are
+// shifted so the newest sign-off is "just now": the 90-day views stay populated
+// whenever the demo is run, and the committed sample files stay unchanged.
+const ANCHOR_MS = Date.parse('2026-11-08T12:30:00+05:30');
+const IST_MS = 5.5 * 3600_000;
+function shiftCsv(text, targetMs = Date.now()) {
+  const delta = targetMs - ANCHOR_MS;
+  return text.replace(/\b(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})\b/g, (m, y, mo, d, h, mi) => {
+    const t = Date.parse(`${y}-${mo}-${d}T${h}:${mi}:00+05:30`) + delta;
+    return new Date(t + IST_MS).toISOString().slice(0, 16).replace('T', ' ');
+  });
+}
+
 const USERS = [
   ['frontdesk1', 'Front desk (demo)', 'frontdesk'],
   ['pathologist1', 'Pathologist (demo)', 'pathologist'],
@@ -25,7 +38,8 @@ function seedDemo({ db, cfg }) {
   const orders = db.prepare('SELECT COUNT(*) AS c FROM orders').get().c;
   if (!orders) {
     fs.mkdirSync(cfg.exportDir, { recursive: true });
-    fs.copyFileSync(path.join(cfg.sampleDir, 'lis-export-1.csv'), path.join(cfg.exportDir, 'lis-export-1.csv'));
+    const text = fs.readFileSync(path.join(cfg.sampleDir, 'lis-export-1.csv'), 'utf8');
+    fs.writeFileSync(path.join(cfg.exportDir, 'lis-export-1.csv'), shiftCsv(text));
   }
 }
 
@@ -33,8 +47,8 @@ function seedDemo({ db, cfg }) {
 function dropSignoffBatch({ cfg }) {
   fs.mkdirSync(cfg.exportDir, { recursive: true });
   const dest = path.join(cfg.exportDir, `lis-export-2-signoff-${Date.now()}.csv`);
-  fs.copyFileSync(path.join(cfg.sampleDir, 'lis-export-2-signoff.csv'), dest);
+  fs.writeFileSync(dest, shiftCsv(fs.readFileSync(path.join(cfg.sampleDir, 'lis-export-2-signoff.csv'), 'utf8')));
   return path.basename(dest);
 }
 
-module.exports = { seedDemo, dropSignoffBatch, USERS };
+module.exports = { seedDemo, dropSignoffBatch, shiftCsv, USERS };
