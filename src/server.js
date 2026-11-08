@@ -11,6 +11,7 @@ const sessions = require('./services/sessions');
 const cfg = build();
 const db = open(cfg.dbFile);
 const ctx = createContext({ cfg, db });
+ctx.extraRoutes = [require('./routes/staff').mount, require('./routes/dev').mount];
 
 if (cfg.demo) seedDemo(ctx);
 fs.mkdirSync(cfg.exportDir, { recursive: true });

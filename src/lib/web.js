@@ -54,6 +54,12 @@ class RateLimiter {
     e.n++;
     return e.n > max ? { ok: false, retryAfterSec: Math.ceil((e.reset - now) / 1000) } : { ok: true };
   }
+  /** True when `key` has already used up `max` hits in the current window (does not count a hit). */
+  blocked(key, max) {
+    const e = this.hits.get(key);
+    return !!e && Date.now() <= e.reset && e.n >= max;
+  }
+  reset(key) { this.hits.delete(key); }
   sweep(now) { for (const [k, v] of this.hits) if (now > v.reset) this.hits.delete(k); }
 }
 

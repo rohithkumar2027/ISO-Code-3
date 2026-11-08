@@ -19,6 +19,7 @@ async function startApp({ files = ['lis-export-1.csv'], ai = null, cfgOver = {} 
   const db = open(':memory:');
   const provider = new MockProvider({ receiptDelayMs: 0 });
   const ctx = createContext({ cfg, db, provider, ai });
+  ctx.extraRoutes = [require('../src/routes/staff').mount, require('../src/routes/dev').mount];
   for (const f of files) importCsv(db, { text: sample(f), filename: f, source: 'upload' });
   const ins = db.prepare('INSERT INTO staff_users (username, name, role, password_hash) VALUES (?,?,?,?)');
   const pw = hashPassword('test-pass-1');
