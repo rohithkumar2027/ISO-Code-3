@@ -1,0 +1,38 @@
+Order ID,Patient,Parameter,Result,Reference Range,Status,Referring Doctor,Mobile,Age,Sex,Collected At,Signed At
+ORD-71204,Lakshmi Prasanna K,Haemoglobin g/dL,10.2,12.0-15.5,Ready,Dr. S. Ramanaiah,9000000001,54,F,2026-11-07 08:10,2026-11-07 17:40
+ORD-71204,Lakshmi Prasanna K,Total WBC count cells/µL,7200,4000-11000,Ready,Dr. S. Ramanaiah,9000000001,54,F,2026-11-07 08:10,2026-11-07 17:40
+ORD-71204,Lakshmi Prasanna K,Platelet count 10^3/µL,262,150-410,Ready,Dr. S. Ramanaiah,9000000001,54,F,2026-11-07 08:10,2026-11-07 17:40
+ORD-71204,Lakshmi Prasanna K,MCV fL,78,80-100,Ready,Dr. S. Ramanaiah,9000000001,54,F,2026-11-07 08:10,2026-11-07 17:40
+ORD-71219,Venkata Rao M,LDL cholesterol mg/dL,142,0-100,Processing,Dr. P. Anitha,9000000001,61,M,2026-11-08 07:50,
+ORD-71219,Venkata Rao M,Total cholesterol mg/dL,218,0-200,Processing,Dr. P. Anitha,9000000001,61,M,2026-11-08 07:50,
+ORD-71219,Venkata Rao M,HDL cholesterol mg/dL,41,40-60,Processing,Dr. P. Anitha,9000000001,61,M,2026-11-08 07:50,
+ORD-71219,Venkata Rao M,Triglycerides mg/dL,168,0-150,Processing,Dr. P. Anitha,9000000001,61,M,2026-11-08 07:50,
+ORD-71233,Farzana Begum,Potassium mmol/L,6.8,3.5-5.1,Ready (critical),Dr. K. Suresh,9000000002,47,F,2026-11-07 09:05,2026-11-07 15:20
+ORD-71233,Farzana Begum,Sodium mmol/L,138,135-145,Ready (critical),Dr. K. Suresh,9000000002,47,F,2026-11-07 09:05,2026-11-07 15:20
+ORD-71233,Farzana Begum,Creatinine mg/dL,1.9,0.6-1.1,Ready (critical),Dr. K. Suresh,9000000002,47,F,2026-11-07 09:05,2026-11-07 15:20
+ORD-71240,Suresh Babu P,Fasting blood glucose mg/dL,118,70-100,Ready,Dr. S. Ramanaiah,9000000003,38,M,2026-11-06 07:30,2026-11-06 13:15
+ORD-71240,Suresh Babu P,HbA1c %,6.1,4.0-5.6,Ready,Dr. S. Ramanaiah,9000000003,38,M,2026-11-06 07:30,2026-11-06 13:15
+ORD-71240,Suresh Babu P,Total cholesterol mg/dL,182,0-200,Ready,Dr. S. Ramanaiah,9000000003,38,M,2026-11-06 07:30,2026-11-06 13:15
+ORD-71240,Suresh Babu P,Triglycerides mg/dL,210,0-150,Ready,Dr. S. Ramanaiah,9000000003,38,M,2026-11-06 07:30,2026-11-06 13:15
+ORD-71241,Anjali Devi T,TSH mIU/L,6.2,0.4-4.0,Ready,Dr. P. Anitha,9000000004,29,F,2026-11-07 10:00,2026-11-07 18:05
+ORD-71241,Anjali Devi T,Vitamin D ng/mL,14,30-100,Ready,Dr. P. Anitha,9000000004,29,F,2026-11-07 10:00,2026-11-07 18:05
+ORD-71241,Anjali Devi T,Vitamin B12 pg/mL,410,200-900,Ready,Dr. P. Anitha,9000000004,29,F,2026-11-07 10:00,2026-11-07 18:05
+ORD-71245,Ramesh Kumar G,Creatinine mg/dL,1.0,0.7-1.3,Ready,Dr. K. Suresh,9000000005,66,M,2026-11-07 08:45,2026-11-07 14:30
+ORD-71245,Ramesh Kumar G,Blood urea mg/dL,28,15-40,Ready,Dr. K. Suresh,9000000005,66,M,2026-11-07 08:45,2026-11-07 14:30
+ORD-71245,Ramesh Kumar G,Uric acid mg/dL,7.9,3.5-7.2,Ready,Dr. K. Suresh,9000000005,66,M,2026-11-07 08:45,2026-11-07 14:30
+ORD-71245,Ramesh Kumar G,SGPT (ALT) U/L,62,0-45,Ready,Dr. K. Suresh,9000000005,66,M,2026-11-07 08:45,2026-11-07 14:30
+ORD-71245,Ramesh Kumar G,Lipoprotein (a) mg/dL,62,0-30,Ready,Dr. K. Suresh,9000000005,66,M,2026-11-07 08:45,2026-11-07 14:30
+ORD-71245,Ramesh Kumar G,Urine albumin,Trace,Nil,Ready,Dr. K. Suresh,9000000005,66,M,2026-11-07 08:45,2026-11-07 14:30
+ORD-71250,Kavya Reddy N,Haemoglobin g/dL,12.4,11.5-15.5,Ready,Dr. P. Anitha,9000000004,8,F,2026-11-07 10:00,2026-11-07 18:05
+ORD-71250,Kavya Reddy N,Total WBC count cells/µL,8300,4000-11000,Ready,Dr. P. Anitha,9000000004,8,F,2026-11-07 10:00,2026-11-07 18:05
+ORD-71250,Kavya Reddy N,Platelet count 10^3/µL,310,150-410,Ready,Dr. P. Anitha,9000000004,8,F,2026-11-07 10:00,2026-11-07 18:05
+ORD-71252,Mohammed Irfan S,Haemoglobin g/dL,15.1,13.0-17.0,Ready,Dr. S. Ramanaiah,9000000013,35,M,2026-11-06 09:20,2026-11-06 16:45
+ORD-71252,Mohammed Irfan S,ESR mm/hr,28,0-15,Ready,Dr. S. Ramanaiah,9000000013,35,M,2026-11-06 09:20,2026-11-06 16:45
+ORD-71252,Mohammed Irfan S,CRP mg/L,12,0-5,Ready,Dr. S. Ramanaiah,9000000013,35,M,2026-11-06 09:20,2026-11-06 16:45
+ORD-71255,Sunitha Rani B,Calcium mg/dL,8.1,8.6-10.2,Ready,Dr. P. Anitha,9000000099,42,F,2026-11-07 11:15,2026-11-07 17:00
+ORD-71255,Sunitha Rani B,Vitamin D ng/mL,22,30-100,Ready,Dr. P. Anitha,9000000099,42,F,2026-11-07 11:15,2026-11-07 17:00
+ORD-71260,Chandra Sekhar V,Fasting blood glucose mg/dL,131,70-100,Processing,Dr. K. Suresh,9000000006,72,M,2026-11-08 07:40,
+ORD-71260,Chandra Sekhar V,Creatinine mg/dL,1.4,0.7-1.3,Processing,Dr. K. Suresh,9000000006,72,M,2026-11-08 07:40,
+ORD-71261,Padmavathi L,HbA1c %,8.9,4.0-5.6,Ready,Dr. S. Ramanaiah,9000000007,69,F,2026-11-07 08:00,2026-11-07 14:10
+ORD-71261,Padmavathi L,Fasting blood glucose mg/dL,176,70-100,Ready,Dr. S. Ramanaiah,9000000007,69,F,2026-11-07 08:00,2026-11-07 14:10
+ORD-71261,Padmavathi L,Creatinine mg/dL,0.8,0.6-1.1,Ready,Dr. S. Ramanaiah,9000000007,69,F,2026-11-07 08:00,2026-11-07 14:10
