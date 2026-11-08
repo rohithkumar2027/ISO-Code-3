@@ -1,0 +1,22 @@
+{
+  "name": "report-portal",
+  "version": "1.0.0",
+  "description": "Report-delivery portal for a diagnostic lab chain: LIS import, signed-report links, patient OTP portal, plain-language summaries, front-desk console.",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/server.js",
+    "demo": "node --disable-warning=ExperimentalWarning src/server.js --demo",
+    "test": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 test/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rohithkumar2027/ISO-Code-3.git"
+  },
+  "dependencies": {
+    "express": "^4.22.3",
+    "multer": "^2.5.0",
+    "pdfkit": "^0.15.2"
+  }
+}
