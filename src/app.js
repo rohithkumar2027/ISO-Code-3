@@ -36,7 +36,7 @@ function createApp(ctx) {
     res.set({
       'Content-Security-Policy': "default-src 'none'; style-src 'self'; img-src 'self' data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
       'X-Content-Type-Options': 'nosniff',
-      'Referrer-Policy': 'no-referrer',
+      'Referrer-Policy': 'same-origin', // never leaks the report-link URL to other sites, but browsers still send Origin on form posts
       'Cache-Control': 'no-store',
       'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
       'X-Frame-Options': 'DENY',
@@ -66,11 +66,14 @@ function createApp(ctx) {
   // CSRF defence in depth (cookies are also SameSite=Lax): a cross-site POST is refused.
   app.use((req, res, next) => {
     if (req.method === 'GET' || req.method === 'HEAD') return next();
+    const refuse = () => res.status(403).send(String(errorPage(req.lang, 'err_title', 'err_body')));
+    const site = req.get('sec-fetch-site'); // sent by all current browsers
+    if (site && site !== 'same-origin' && site !== 'none') return refuse();
     const origin = req.get('origin') || req.get('referer');
-    if (origin) {
+    if (origin && origin !== 'null') {
       let host = null;
       try { host = new URL(origin).host; } catch { /* malformed */ }
-      if (host !== req.get('host')) return res.status(403).send(String(errorPage(req.lang, 'err_title', 'err_body')));
+      if (host !== req.get('host')) return refuse();
     }
     next();
   });

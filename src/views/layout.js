@@ -14,7 +14,7 @@ function patientPage({ lang, title, body, path = '/', csrf = null, loggedIn = fa
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<meta name="referrer" content="no-referrer">
+<meta name="referrer" content="same-origin">
 <title>${title} · ${t(lang, 'brand')}</title>
 <link rel="stylesheet" href="/app.css?v=${ASSET_V}">
 ${extraHead}

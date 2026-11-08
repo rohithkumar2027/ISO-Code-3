@@ -217,11 +217,15 @@ test('cross-site POSTs are refused (Origin check) and security headers are set',
   const c = app.client();
   const evil = await c.post('/login', { mobile: '9000000001' }, { headers: { origin: 'https://evil.example' } });
   assert.equal(evil.status, 403);
+  // browsers that send Sec-Fetch-Site: cross-site are refused even without an Origin header
+  assert.equal((await c.post('/login', { mobile: '9000000001' }, { headers: { 'sec-fetch-site': 'cross-site' } })).status, 403);
+  // Origin: null (sandboxed or no-referrer forms) is not trusted on its own but same-origin Fetch Metadata passes
+  assert.notEqual((await c.post('/login', { mobile: '9123456780' }, { headers: { origin: 'null', 'sec-fetch-site': 'same-origin' } })).status, 403);
   const r = await c.get('/login');
   const h = r.headers;
   assert.match(h.get('content-security-policy'), /default-src 'none'/);
   assert.match(h.get('content-security-policy'), /style-src 'self'/);
-  assert.equal(h.get('referrer-policy'), 'no-referrer');
+  assert.equal(h.get('referrer-policy'), 'same-origin');
   assert.equal(h.get('cache-control'), 'no-store');
   assert.equal(h.get('x-content-type-options'), 'nosniff');
   assert.equal(h.get('x-powered-by'), null);
