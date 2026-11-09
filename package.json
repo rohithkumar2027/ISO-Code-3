@@ -6,9 +6,12 @@
   "license": "UNLICENSED",
   "engines": { "node": ">=22.13" },
   "scripts": {
-    "start": "node --disable-warning=ExperimentalWarning src/server.js",
-    "demo": "node --disable-warning=ExperimentalWarning src/server.js --demo",
-    "test": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 \"test/*.test.js\""
+    "start": "node scripts/ensure-web.js && node --disable-warning=ExperimentalWarning src/server.js",
+    "demo": "node scripts/ensure-web.js && node --disable-warning=ExperimentalWarning src/server.js --demo",
+    "build:web": "node scripts/ensure-web.js --force",
+    "dev:web": "npm --prefix web install --no-audit --no-fund && npm --prefix web run dev",
+    "test": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 \"test/*.test.js\"",
+    "test:web": "npm --prefix web install --no-audit --no-fund && npm --prefix web test"
   },
   "repository": {
     "type": "git",
