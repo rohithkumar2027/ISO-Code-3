@@ -1,0 +1,42 @@
+/* Design tokens — warm editorial palette.
+   No webfonts: the brief's "weak data" constraint still holds, so the oversized,
+   editorial feel comes from the type SCALE, generous leading and system serif
+   stacks (which already cover Telugu/Hindi on Android, iOS, Windows and macOS)
+   rather than a downloaded font file. */
+:root {
+  --ivory: #fbf7ef;
+  --ivory-deep: #f4ecdd;
+  --paper: #ffffff;
+  --ink: #1c2420;
+  --ink-soft: #4b564e;
+  --line: #e7ddc9;
+
+  --forest: #1b3b2f;
+  --forest-deep: #112820;
+  --forest-soft: #2f5d46;
+  --forest-tint: #e8efe7;
+  --forest-tint-2: #dce9e0;
+
+  --gold: #a9802f;
+  --rust: #8c3a2b;
+  --rust-tint: #f6e7e2;
+  --ochre: #92701f;
+  --ochre-tint: #f6eed9;
+
+  --radius-lg: 28px;
+  --radius-md: 20px;
+  --radius-sm: 12px;
+  --shadow-1: 0 1px 2px rgba(27, 59, 47, 0.06), 0 8px 24px -12px rgba(27, 59, 47, 0.18);
+  --shadow-2: 0 2px 6px rgba(27, 59, 47, 0.08), 0 20px 48px -16px rgba(27, 59, 47, 0.28);
+
+  --serif: Georgia, 'Iowan Old Style', 'Noto Serif', 'Noto Serif Telugu', 'Noto Serif Devanagari', 'Times New Roman', serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', 'Noto Sans Telugu', 'Noto Sans Devanagari', 'Nirmala UI', sans-serif;
+
+  --container: 760px;
+  --gutter: clamp(20px, 6vw, 56px);
+}
+
+/* Deliberately no prefers-color-scheme dark mode: the brief's identity is
+   this warm ivory/forest palette specifically, and most of this app's
+   readers are elderly patients on small phones, where a surprise theme
+   swap costs more in legibility than it gains. The design stays light. */
