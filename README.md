@@ -4,7 +4,7 @@ Patients should never have to call the lab to ask about a report. When the patho
 patient gets a safe, expiring link on WhatsApp or SMS, opens it with a one-time code, and reads a
 short plain-language explanation in English, Telugu or Hindi.
 
-Repository: <https://github.com/rohithkumar2027/ISO-Code-3> · Design document: [docs/TDD.md](docs/TDD.md)
+Repository: <https://github.com/rohithkumar2027/ISO-Code-3> · Design document: [docs/TDD.md](docs/TDD.md) · Deployment guide: [deployment.md](deployment.md)
 
 **What works end to end (the "core build" slice, plus extras)**
 
@@ -19,6 +19,7 @@ Repository: <https://github.com/rohithkumar2027/ISO-Code-3> · Design document: 
 | Front desk: find a patient, resend link, delivery status per message, access log | `/staff` |
 | Operations: delivery and access report | `/staff/report` |
 | Pathologist: review flagged, AI-written and weekly-sample summaries | `/staff/review` |
+| Doctor portal (React, own login): review orders, sign off and dispatch, plus a document broadcast — keep a library of PDFs and send one to a list of patient mobile numbers as individual OTP-gated links | `/doctor`, `src/services/broadcast*.js` |
 
 Not built: the referring-doctor 90-day view (optional in the brief). See "Limits" in the TDD.
 
@@ -66,21 +67,27 @@ once. Demo mode does three more things, and refuses to run in production:
 5. **Front desk** (`/staff`, user `frontdesk1`): search "Irfan" (WhatsApp failed → SMS fallback), "Sunitha" (both channels failed → listed on the home screen), resend a link, open **Callbacks** and complete the critical one, open **Access log**.
 6. **Sign-off automation**: **LIS import → "Demo: LIS signs off the next batch"**. Venkata Rao's cholesterol order flips from *Being prepared* to *Ready* and a link goes out. The batch also contains two deliberately bad rows; see how they are reported.
 7. **Pathologist** (`pathologist1`): review the flagged summary. **Ops** (`ops1`): delivery report.
+8. **Doctor portal** (`/doctor/login`, same `pathologist1` account): the **Document Broadcast** tab —
+   upload a PDF, paste a few of the demo numbers above, send, then open the resulting `/d/...` link
+   from the outbox as a patient. Each recipient gets their own 72-hour, OTP-gated link, the same
+   pattern as a report link, not a raw attachment.
 
 Demo patient numbers (all fictional): `9000000001`–`9000000008`; `…13` simulates "not on WhatsApp", `…99` simulates an unreachable number.
 
 ### Tests
 
 ```bash
-npm test          # backend: 80 node:test cases (unit + full HTTP API, JSON responses)
+npm test          # backend: 93 node:test cases (unit + full HTTP API, JSON responses)
 npm --prefix web test   # frontend: Vitest + React Testing Library
 ```
 
 No network, no external services. Backend: rules engine, importer, OTP, links, sessions,
 summaries and AI guardrails, plus HTTP-level tests driving the real app and `/api/*` for the
-patient and staff journeys — access control, IDOR, CSRF, rate limits, secret handling. Frontend:
-i18n coverage across all three languages, the range-bar component's edge cases, and the login
-form's error handling (invalid number, wrong OTP, rate-limited).
+patient, staff and doctor journeys — access control, IDOR, CSRF, rate limits, secret handling, and
+the doctor/broadcast auth fix described in docs/TDD.md (every `/doctor/*` route 401s an
+unauthenticated caller, wrong password/role/rate-limiting, non-PDF uploads rejected, the
+too-many-recipients cap, file download requiring a completed OTP). Frontend: i18n coverage across
+all three languages, the range-bar component's edge cases, and the login form's error handling.
 
 ## Configuration
 
@@ -95,6 +102,7 @@ Copy `.env.example` to `.env` (git-ignored). Everything has a safe default for l
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | Optional. Enables AI wording for tests that have no locked template. Without it those fall back to a safe generic sentence. |
 | `DEMO_MODE=1` | Same as `--demo`. Rejected when `NODE_ENV=production`. |
 | `TRUST_PROXY` | Set to `1` behind a reverse proxy so client IPs in the access log are correct. |
+| `DOCUMENTS_DIR` | Folder uploaded broadcast PDFs are stored in (default `data/documents`, git-ignored). |
 
 ## Layout
 
@@ -104,7 +112,8 @@ src/
   config.js, db.js         Settings and SQLite (schema in schema.sql)
   routes/                  api.js (JSON, for the React app), staff.js (console), dev.js (demo outbox)
   services/                importer, ingest (folder watcher), delivery (sign-off automation),
-                           links, otp, sessions, messaging (mock), summaries/, pdf, metrics, audit
+                           links, otp, sessions, messaging (mock), summaries/, pdf, metrics, audit,
+                           broadcast + broadcastLinks + documents (doctor document broadcast)
   views/                   Server-rendered staff-console pages (auto-escaping html`` helper)
   i18n.js                  Staff-console strings (the React app has its own, in web/src/i18n.js)
 public/app.css             Staff console's only stylesheet. No JavaScript there either.

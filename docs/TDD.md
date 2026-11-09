@@ -1,6 +1,7 @@
 # Technical Design Document: Report-delivery portal
 
 Repository: <https://github.com/rohithkumar2027/ISO-Code-3>
+Live app: not deployed to a public host for this submission — see deployment.md to run it locally in one command.
 Client: Company A (6 labs, 38 collection centres, Vijayawada). Budget ₹6.5 lakh, 6 weeks.
 
 ## 1. Goal and scope
