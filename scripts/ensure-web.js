@@ -14,6 +14,8 @@ if (fs.existsSync(index) && !process.argv.includes('--force')) process.exit(0);
 
 console.log('Building the web app (first run only; re-run with --force to rebuild)...');
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-const run = (args) => execFileSync(npmCmd, args, { cwd: webDir, stdio: 'inherit' });
+// shell:true on Windows: npm.cmd is a batch file, which Windows can only run
+// through a shell (not directly via CreateProcess, which spawnSync defaults to).
+const run = (args) => execFileSync(npmCmd, args, { cwd: webDir, stdio: 'inherit', shell: process.platform === 'win32' });
 if (!fs.existsSync(path.join(webDir, 'node_modules'))) run(['install', '--no-audit', '--no-fund']);
 run(['run', 'build']);

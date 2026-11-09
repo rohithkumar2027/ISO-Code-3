@@ -10,6 +10,7 @@
     "demo": "node scripts/ensure-web.js && node --disable-warning=ExperimentalWarning src/server.js --demo",
     "build:web": "node scripts/ensure-web.js --force",
     "dev:web": "npm --prefix web install --no-audit --no-fund && npm --prefix web run dev",
+    "pretest": "node scripts/ensure-web.js",
     "test": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 \"test/*.test.js\"",
     "test:web": "npm --prefix web install --no-audit --no-fund && npm --prefix web test"
   },
