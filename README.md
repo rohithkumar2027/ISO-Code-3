@@ -12,8 +12,8 @@ Repository: <https://github.com/rohithkumar2027/ISO-Code-3> · Design document: 
 |---|---|
 | LIS CSV import from a watched folder or a manual upload, with row-level error reporting | `src/services/importer.js`, `ingest.js`, staff **LIS import** |
 | Automatic link on sign-off (WhatsApp first, SMS fallback, delivery status tracked) | `src/services/delivery.js`, `messaging.js` |
-| Secure expiring links: 256-bit token, stored hashed, 72 h expiry, **OTP to the number on file on every open** | `links.js`, `otp.js`, `routes/patient.js` |
-| Patient portal: mobile + OTP login, DPDP consent, order list with status, report view, PDF download | `/login`, `/reports` |
+| Secure expiring links: 256-bit token, stored hashed, 72 h expiry, **OTP to the number on file on every open** | `links.js`, `otp.js`, `routes/api.js` |
+| Patient portal (React, editorial design): mobile + OTP login, DPDP consent, order list with status, report view, PDF download | `web/`, `/login`, `/reports` |
 | Plain-language summary of out-of-range values in en / te / hi, rule-based flags, locked templates for 30 tests, validated AI for the rest, patient "looks wrong" flag | `src/services/summaries/` |
 | Critical values: no summary, banner for the patient, callback task for staff | `delivery.js`, `/staff/tasks` |
 | Front desk: find a patient, resend link, delivery status per message, access log | `/staff` |
@@ -21,6 +21,25 @@ Repository: <https://github.com/rohithkumar2027/ISO-Code-3> · Design document: 
 | Pathologist: review flagged, AI-written and weekly-sample summaries | `/staff/review` |
 
 Not built: the referring-doctor 90-day view (optional in the brief). See "Limits" in the TDD.
+
+## Two front ends, one backend
+
+The **patient app** (`web/`) is a React single-page app with an editorial design — warm ivory
+background, deep forest-green accents, oversized serif headings, rounded cards, subtle motion. It
+talks to the Express backend only through a JSON API (`/api/*`); all the security logic (hashed
+OTPs and link tokens, server-side sessions, CSRF, the DPDP consent gate, the access log) lives
+unchanged in `src/services/`, exactly as before.
+
+The **staff console** (front desk, pathologist, operations) stayed server-rendered Express/HTML —
+it's an internal tool used at a front desk, not the patient-facing "website" the redesign was
+about, and rebuilding it too would have doubled the work for no benefit the brief asked for.
+
+One deliberate trade-off: the original server-rendered patient pages were a few KB and shipped no
+JavaScript at all, for patients on weak data. The React app is heavier — about **100 KB gzipped of
+JavaScript**, one load, cached after that — because an SPA with animation needs a framework and a
+router. It still ships **no images or webfonts** (the "beautiful imagery" is original inline SVG
+line art, not stock photography) to keep that cost as low as it reasonably can be. This is called
+out in [docs/TDD.md](docs/TDD.md) as a named trade-off, not a silent regression.
 
 ## Run it
 
@@ -31,7 +50,8 @@ npm install
 npm run demo
 ```
 
-Open <http://localhost:3000>. Demo mode does three things, and refuses to run in production:
+The first run also builds the React app (`web/`) automatically — that takes a few extra seconds
+once. Demo mode does three more things, and refuses to run in production:
 
 1. Creates three staff accounts and **prints their throw-away password in the console** (nothing is stored in the repository).
 2. Copies the sample LIS export into `lis-export/` (dates shifted so the newest sign-off is "just now"). The folder watcher imports it and "sends" the links.
@@ -52,12 +72,15 @@ Demo patient numbers (all fictional): `9000000001`–`9000000008`; `…13` simul
 ### Tests
 
 ```bash
-npm test
+npm test          # backend: 80 node:test cases (unit + full HTTP API, JSON responses)
+npm --prefix web test   # frontend: Vitest + React Testing Library
 ```
 
-82 tests, no network, no external services: unit tests for the rules engine, importer, OTP, links,
-sessions, summaries and AI guardrails; HTTP-level tests that drive the real app for the patient
-and staff journeys, including access control, CSRF, rate limits and secret handling.
+No network, no external services. Backend: rules engine, importer, OTP, links, sessions,
+summaries and AI guardrails, plus HTTP-level tests driving the real app and `/api/*` for the
+patient and staff journeys — access control, IDOR, CSRF, rate limits, secret handling. Frontend:
+i18n coverage across all three languages, the range-bar component's edge cases, and the login
+form's error handling (invalid number, wrong OTP, rate-limited).
 
 ## Configuration
 
@@ -77,15 +100,20 @@ Copy `.env.example` to `.env` (git-ignored). Everything has a safe default for l
 
 ```
 src/
-  app.js, server.js        Express app (security headers, CSRF, routing) and entry point
+  app.js, server.js        Express app (security headers, CSRF, API + SPA + staff routing), entry point
   config.js, db.js         Settings and SQLite (schema in schema.sql)
-  routes/                  patient.js (portal), staff.js (console), dev.js (demo outbox)
+  routes/                  api.js (JSON, for the React app), staff.js (console), dev.js (demo outbox)
   services/                importer, ingest (folder watcher), delivery (sign-off automation),
                            links, otp, sessions, messaging (mock), summaries/, pdf, metrics, audit
-  views/                   Server-rendered pages (auto-escaping html`` helper)
-  i18n.js                  Patient strings in en / te / hi
-public/app.css             The only static asset (about 10 KB, 3 KB gzipped). No JavaScript.
+  views/                   Server-rendered staff-console pages (auto-escaping html`` helper)
+  i18n.js                  Staff-console strings (the React app has its own, in web/src/i18n.js)
+public/app.css             Staff console's only stylesheet. No JavaScript there either.
+web/                       React patient app (Vite). See "Two front ends, one backend" above.
+  src/pages/, components/  Screens and shared UI (buttons, cards, the range-bar SVG, the OTP form)
+  src/lib/api.js           Thin fetch wrapper for /api/*; src/lib/SessionContext.jsx owns session state
+  src/i18n.js              Patient strings in en / te / hi
+  dist/                    Build output (git-ignored); Express serves it directly, no separate server
 data/sample/               Fictional LIS exports used by demo mode and the tests
-test/                      node:test suites
+test/                      node:test suites (backend); web/src/**/*.test.jsx (frontend, Vitest)
 docs/TDD.md                Technical design, assumptions, security model, limits
 ```

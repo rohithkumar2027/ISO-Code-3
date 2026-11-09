@@ -22,6 +22,11 @@ LIS changes, test booking/payment, home collection.
 **Deliberate choice:** build the core slice well rather than every item thinly. One honest hard part
 (links + OTP) gets the most care.
 
+**Revision note.** The patient-facing UI was rebuilt a second time, on the client's explicit instruction,
+as a React single-page app with a warm-ivory/forest-green editorial design (oversized serif type, rounded
+cards, subtle motion). The backend's security model, routes-as-data and tests did not change — see §3 and
+§9 for exactly what moved and the one real trade-off it cost (page weight, since patients are on weak data).
+
 ## 2. Assumptions (labelled; the brief gave only three sample rows)
 
 | # | Assumption | Why / effect |
@@ -43,8 +48,10 @@ LIS changes, test booking/payment, home collection.
 
 ## 3. Architecture
 
-Deliberately small: one Node.js process, server-rendered HTML, SQLite. **No JavaScript is sent to the
-browser** and pages are a few KB, because patients use low-end phones on weak data.
+One Node.js process, SQLite, and now **two front ends** in front of the same backend: a React single-page
+app for patients (`web/`), and the original server-rendered pages for staff (`src/views/staff.js`). The
+backend is unchanged by that split — same services, same database, same security model — only the patient
+*routes* changed, from HTML (`src/routes/patient.js`, removed) to JSON (`src/routes/api.js`, under `/api/*`).
 
 ```mermaid
 flowchart LR
@@ -55,18 +62,35 @@ flowchart LR
   D --> S[Summaries\nlocked templates, AI, fallback]
   D --> M[Messaging\nWhatsApp then SMS - mock]
   M -- link --> P((Patient phone))
-  P -- link + OTP --> W[Patient portal]
-  W --> DB
-  ST((Front desk / pathologist / ops)) --> C[Staff console]
+  P -- link + OTP --> A[/api/* JSON/]
+  A --> DB
+  A -. serves .-> R[React app - web/dist]
+  R -- fetch --> A
+  ST((Front desk / pathologist / ops)) --> C[Staff console - server-rendered]
   C --> DB
 ```
 
-**Stack choice.** Node 22 + Express, `node:sqlite`, `pdfkit`, `multer` (upload). Four dependencies; no
-front-end build. Server-side templates use an auto-escaping `html` tagged template (all interpolations are
-escaped unless explicitly marked raw), which removes a whole class of XSS mistakes.
+**Stack choice.** Node 22 + Express, `node:sqlite`, `pdfkit`, `multer` (upload) on the backend — unchanged,
+four dependencies, no build step. React + React Router + Framer Motion + Vite (`web/`) for the patient app;
+Vite's production build is static files (`web/dist`) that Express serves directly, so there is still only
+one process and one deployment artifact, not a separate frontend server. Staff pages still use the
+auto-escaping `html` tagged template (all interpolations escaped unless explicitly marked raw).
+
+**Why the split, not a full rewrite.** The brief's redesign instruction was specifically about the
+patient-facing "website"; the staff console is an internal operational tool, and rebuilding it in React
+would have cost real time for no requirement it serves. Reusing `src/services/*` untouched means the parts
+that were reviewed hardest first time — OTP, link hashing, CSRF, the consent gate, the access log — did not
+get rewritten and re-risked along with the visual design.
+
+**The trade-off this cost.** The original patient pages shipped **zero JavaScript** and a few KB per page,
+specifically because the brief says patients are on low-end phones and weak data. A React SPA cannot be
+that light: the bundle is about **100 KB gzipped**, loaded once and cached, versus a 2–6 KB page load
+before. This is a real, named regression against one constraint in the brief, taken on the client's
+explicit instruction to prioritise the new visual design; see §13.
 
 **Production path.** Swap SQLite for PostgreSQL in an Indian region (same SQL, small port), put TLS and
-gzip at a reverse proxy, run two app instances behind it. See Limits.
+gzip/Brotli at a reverse proxy (recovers most of the SPA's extra weight on the wire), run two app instances
+behind it. See Limits.
 
 ## 4. Data model (`src/schema.sql`)
 
@@ -163,40 +187,66 @@ fallback carry everything, and the tests show that.
 
 ## 9. Design and UX decisions
 
-- One clear action per screen, 18 px base text, 56 px controls, a single restrained teal accent.
+**Patient app (React, `web/`).** Warm ivory background, deep forest-green accents, oversized serif
+headings (system serif stack — Georgia/Noto Serif/Devanagari/Telugu — not a downloaded webfont, so it
+still costs nothing on weak data), rounded 20–28 px cards, a single restrained accent colour, and subtle
+Framer Motion transitions (page fade/rise, staggered list reveal) kept short (≤0.4 s) and non-blocking.
+"Beautiful imagery" is original inline SVG line art (a leaf mark, a sprig divider) rather than stock
+photography: it is free to license (we drew it), adds no network request, and matches the editorial brief
+better than a generic stock photo would.
+
+- One clear action per screen, 56 px controls, 17 px base text.
 - Status is never colour alone: "✓ Ready", "… Being prepared", "▼ Low", "▲ High", "! Needs attention".
 - The report page leads with "What stands out": test name, large value, usual range, a small SVG range bar,
   then the explanation. Normal values stay out of the way in "All results".
-- Telugu/Hindi: `lang` attributes, taller line height, system Noto/Nirmala fonts (no web-font download),
-  local-language test names under the English names. Language chips are on every page; the choice is remembered.
-- Loading, empty and error states exist on every list and form (no match, no reports yet, bad file, expired
-  link, locked OTP).
-- Weight: login page 1.3 KB; report page ≈ 5–6 KB (≈ 2 KB gzipped); one 10 KB stylesheet (3 KB gzipped);
-  zero JavaScript. Staff screens are denser but use the same stylesheet.
+- Telugu/Hindi: `lang` attributes, taller line height, local-language test names under the English names,
+  own translation file (`web/src/i18n.js`). Language chips are on every page; the choice is remembered
+  (cookie + account, same as before).
+- Loading, empty and error states exist on every list and form (no match, no reports yet, expired link,
+  locked OTP, rate-limited).
+- The design is intentionally light-only (no `prefers-color-scheme` dark mode): an early check in a real
+  browser showed the forest-green headings losing contrast against an auto-dark ivory background, and most
+  readers here are elderly patients on small phones — legibility beat following the OS theme.
+- Weight: ~100 KB gzipped JS (one load, cached), ~2.6 KB gzipped CSS, no images, no webfonts. Up from a
+  2–6 KB-per-page, zero-JS HTML page before — the named trade-off in §3.
+
+**Staff console (unchanged, server-rendered).** One clear action per screen, 44–56 px controls, status
+never colour alone, loading/empty/error states throughout. Denser than the patient app since it's used on
+a desk, not a phone.
 
 ## 10. Security checklist
 
 Auto-escaped templates; parameterised SQL everywhere (LIKE inputs escaped); strict CSP (`default-src 'none'`,
 no inline script or style); `nosniff`, `X-Frame-Options`, `no-store` on all dynamic pages, HSTS in production;
-CSRF: `SameSite=Lax`, Fetch-Metadata and Origin checks on every POST, per-session tokens on authenticated forms;
-scrypt for staff passwords with a dummy hash to equalise timing; failed-login lockout; role checks on every staff
-route; upload limits (size, type, count); no secrets in the repo (`.env` ignored; `APP_SECRET` mandatory in
+CSRF: `SameSite=Lax`, Fetch-Metadata and Origin checks on every POST (both the HTML staff forms and the
+React app's JSON calls), a per-session token the React app echoes as `X-CSRF-Token`; scrypt for staff
+passwords with a dummy hash to equalise timing; failed-login lockout; role checks on every staff route;
+upload limits (size, type, count); no secrets in the repo (`.env` ignored; `APP_SECRET` mandatory in
 production; demo passwords are random per run and printed, never stored; `DEMO_MODE` refused in production);
-errors never expose stack traces; `npm audit` clean.
+errors never expose stack traces; CSP tightened for the SPA build (`script-src 'self'`, no `unsafe-inline`
+JS — only the CSS-in-JS styles React writes need `style-src 'self' 'unsafe-inline'`); `npm audit` clean on
+both the backend and `web/`.
 
 ## 11. Testing
 
-82 tests (`npm test`), no network. Important logic is covered at two levels:
+80 backend tests (`npm test`) + 10 frontend tests (`npm --prefix web test`), no network. Important logic is
+covered at three levels:
 
-- **Unit:** range/flag rules, CSV parsing, importer edge cases (idempotency, partial orders, signed-order
-  protection), OTP (expiry, lockout, single use, binding), links (hashing, expiry, revoke), sessions,
-  summaries (30 templates × 3 languages, AI validation, fallbacks, critical rule, flag/review), delivery
-  (single send, concurrency, critical task, SMS fallback, total failure, resend).
-- **HTTP end to end:** login and consent, link flow, IDOR attempts, expired links, session expiry, CSRF and
-  headers, secrets-not-in-database checks, every staff page's role gate, search injection, import upload
-  limits, callbacks, access log, ops numbers, pathologist review.
+- **Backend unit:** range/flag rules, CSV parsing, importer edge cases (idempotency, partial orders,
+  signed-order protection), OTP (expiry, lockout, single use, binding), links (hashing, expiry, revoke),
+  sessions, summaries (30 templates × 3 languages, AI validation, fallbacks, critical rule, flag/review),
+  delivery (single send, concurrency, critical task, SMS fallback, total failure, resend).
+- **Backend HTTP end to end** (`test/api.test.js`, `test/staff.test.js`): login and consent over the JSON
+  API, link flow, IDOR attempts (404, not 403), expired links, session expiry, CSRF and security headers,
+  secrets-not-in-database checks, the SPA fallback route, every staff page's role gate, search injection,
+  import upload limits, callbacks, access log, ops numbers, pathologist review.
+- **Frontend** (Vitest + React Testing Library): all three languages carry every patient-facing string; the
+  range-bar SVG's edge cases (missing value, one-sided ranges, a value far outside the band); the login
+  form's error handling (invalid number, wrong code, rate-limited with the server's retry time shown).
 
-Visual and mobile checks were done by hand in a 375 px browser (login, consent, list, report in Telugu).
+Visual and mobile checks were done by hand in a 375 px browser against the live app (login, OTP, consent,
+report list, a flagged low value, a critical report with no explanation, PDF headers) — this pass is also
+where the dark-mode contrast issue in §9 was caught and fixed before it shipped.
 
 ## 12. Success metrics and how the product measures them
 
@@ -225,6 +275,14 @@ Visual and mobile checks were done by hand in a 375 px browser (login, consent, 
 10. Critical reports still send the link (patients are not made to wait for a call); the report shows an urgent
     banner without explanation and a callback task is raised. The alternative (hold the link until the callback
     is done) is a one-line policy change in `delivery.js`: the client should choose.
+11. The patient app is now a React SPA at ~100 KB gzipped JS, against the brief's "pages must be light" for
+    patients on weak data. This is a named, deliberate trade-off (the client asked for the redesign over that
+    constraint — see §3), not an oversight, and it is mitigated where it reasonably can be: no images, no
+    webfonts, one cached load, and a reverse proxy's gzip/Brotli in production narrows the gap further. It
+    should still be flagged to the client explicitly, since it works against one of the brief's named success
+    conditions for the elderly, low-end-phone patients this product is for.
+12. The staff console was deliberately left out of the redesign (§3); it does not share the patient app's new
+    visual language, which a reviewer comparing screens side by side will notice.
 
 ## 14. If this went to production (6 weeks, ₹6.5 lakh)
 
