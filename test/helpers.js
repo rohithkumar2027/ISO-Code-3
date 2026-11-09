@@ -59,10 +59,30 @@ function client(base) {
     const text = res.headers.get('content-type')?.includes('pdf') ? '' : await res.text();
     return { status: res.status, headers: res.headers, text, location: res.headers.get('location') };
   };
+  const postJson = async (url, body, { csrf, headers = {} } = {}) => {
+    const h = { ...headers, 'content-type': 'application/json' };
+    if (csrf) h['x-csrf-token'] = csrf;
+    if (jar.size) h.cookie = [...jar].map(([k, v]) => `${k}=${v}`).join('; ');
+    h.origin = h.origin ?? base;
+    const res = await fetch(base + url, { method: 'POST', headers: h, body: JSON.stringify(body ?? {}), redirect: 'manual' });
+    for (const c of res.headers.getSetCookie?.() ?? []) {
+      const [pair, ...attrs] = c.split(';');
+      const i = pair.indexOf('=');
+      const name = pair.slice(0, i);
+      const val = decodeURIComponent(pair.slice(i + 1));
+      if (/max-age=0/i.test(attrs.join(';'))) jar.delete(name); else jar.set(name, encodeURIComponent(val));
+    }
+    let json = null;
+    try { json = await res.json(); } catch { /* no body */ }
+    return { status: res.status, headers: res.headers, json };
+  };
+  const getJson = async (u, o) => { const r = await send('GET', u, o); return { ...r, json: r.text ? JSON.parse(r.text) : null }; };
   return {
     get: (u, o) => send('GET', u, o),
+    getJson,
     post: (u, body, o = {}) => send('POST', u, { ...o, body }),
     postForm: (u, form, o = {}) => send('POST', u, { ...o, body: form }),
+    postJson,
     jar,
     cookie: (n) => jar.get(n),
   };
@@ -71,16 +91,15 @@ function client(base) {
 const csrfFrom = (html) => html.match(/name="_csrf" value="([^"]+)"/)?.[1];
 const tokenFromBody = (body) => body.match(/\/r\/([A-Za-z0-9_-]{43})/)?.[1];
 
-/** Log a patient in via mobile + OTP using the mock outbox. */
+/** Log a patient in via mobile + OTP against the JSON API, using the mock outbox for the code. */
 async function loginPatient(app, c, mobile = '9000000001', { consent = true } = {}) {
-  await c.post('/login', { mobile });
+  await c.postJson('/api/login', { mobile });
   const code = app.provider.lastOtp(mobile);
-  const r = await c.post('/login/verify', { code });
-  if (consent && r.location === '/consent') {
-    const page = await c.get('/consent');
-    await c.post('/consent', { _csrf: csrfFrom(page.text), decision: 'agree' });
+  const r = await c.postJson('/api/login/verify', { code });
+  if (consent && r.json?.consent === false) {
+    const s = await c.getJson('/api/session');
+    await c.postJson('/api/consent', { decision: 'agree' }, { csrf: s.json?.patient?.csrf });
   }
-  await c.get('/reports?lang=en'); // tests read English; the account language is remembered across logins by design
   return r;
 }
 

@@ -60,7 +60,7 @@ test('roles: ops and pathologist cannot use front-desk pages; front desk cannot 
   assert.equal((await ops.get('/staff/log')).status, 200);
   assert.equal((await ops.get('/staff/report')).status, 200);
   // a staff cookie is not a patient session and vice versa
-  assert.equal((await fd.get('/reports')).location, '/login');
+  assert.equal((await fd.getJson('/api/reports')).status, 401);
 });
 
 test('find a patient by name, order id and partial mobile; short and hostile input is safe', async () => {
@@ -166,8 +166,8 @@ test('critical callback task: listed, completed with a note, and logged', async 
 
 test('access log: shows patient and staff events, filters by order and action, hides nothing from ops', async () => {
   const pc = app.client();
-  await pc.post('/login', { mobile: '9000000003' });
-  await pc.post('/login/verify', { code: app.provider.lastOtp('9000000003') });
+  await pc.postJson('/api/login', { mobile: '9000000003' });
+  await pc.postJson('/api/login/verify', { code: app.provider.lastOtp('9000000003') });
   const { c } = await staff('ops');
   const all = await c.get('/staff/log');
   assert.match(all.text, /link_sent/);
