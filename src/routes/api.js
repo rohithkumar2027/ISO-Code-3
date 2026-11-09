@@ -6,25 +6,33 @@
 // error reporting (stable string codes instead of pre-translated text), so
 // the React app owns all wording and the three languages.
 const express = require('express');
+const multer = require('multer');
 const { maskMobile, normalizeMobile, logMobile } = require('../lib/phone');
-const { safeEqual } = require('../lib/crypto');
+const { safeEqual, verifyPassword, hashPassword } = require('../lib/crypto');
 const { setCookie, clearCookie, sign, unsign } = require('../lib/web');
 const sessions = require('../services/sessions');
 const otp = require('../services/otp');
 const links = require('../services/links');
+const broadcastLinks = require('../services/broadcastLinks');
+const broadcast = require('../services/broadcast');
+const documents = require('../services/documents');
 const messaging = require('../services/messaging');
 const summaries = require('../services/summaries');
+const delivery = require('../services/delivery');
 const { logAccess } = require('../services/audit');
 const { renderReport } = require('../services/pdf');
 
 const ORDER_ID = /^[A-Z]{2,5}-\d{3,10}$/;
 const LANGS = ['en', 'te', 'hi'];
+const DUMMY_HASH = hashPassword('not-a-real-password'); // equalises timing when the username does not exist
 
 function apiRoutes(ctx) {
   const { db, cfg, provider, limiter } = ctx;
   const r = express.Router();
   const secure = cfg.baseUrl.startsWith('https');
   const lim = { idleMs: cfg.patientIdleMs, maxMs: cfg.patientMaxMs };
+  const staffLim = { idleMs: cfg.staffIdleMs, maxMs: cfg.staffMaxMs };
+  const pdfUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: cfg.maxPdfBytes, files: 1 } });
 
   const who = (mobile) => ({ type: 'patient', ref: logMobile(mobile) });
   const knownMobile = (m) => !!db.prepare('SELECT 1 FROM patients WHERE mobile = ? LIMIT 1').get(m);
@@ -81,6 +89,60 @@ function apiRoutes(ctx) {
     }
   }
   const demoCode = (mobile) => (cfg.demo ? provider.lastOtp(mobile) : null);
+
+  // ---- doctor auth: same staff_users table + scrypt passwords + server sessions as
+  // the HTML staff console (/staff/login), just a JSON login for the React doctor
+  // portal. A doctor and a front-desk/ops login share one session store (cookie
+  // "stf"), so signing in on either surface signs you in on both. ---------------------
+  function loadDoctorSession(req) {
+    const s = sessions.load(db, req.cookies.stf, 'staff', staffLim);
+    if (!s) return null;
+    const u = db.prepare('SELECT id, username, name, role FROM staff_users WHERE id = ? AND active = 1').get(s.staff_id);
+    return u && u.role === 'pathologist' ? { ...s, user: u } : null;
+  }
+  function requireDoctor(req, res, next) {
+    const s = loadDoctorSession(req);
+    if (!s) { if (req.cookies.stf) clearCookie(res, 'stf', secure); return fail(res, 401, 'no_session'); }
+    req.doctorSession = s;
+    next();
+  }
+  function requireDoctorCsrf(req, res, next) {
+    const token = req.get('x-csrf-token');
+    if (!token || !safeEqual(token, req.doctorSession.csrf)) return fail(res, 403, 'bad_csrf');
+    next();
+  }
+
+  r.get('/doctor/session', (req, res) => {
+    const s = loadDoctorSession(req);
+    if (!s) return res.json({ doctor: null });
+    res.json({ doctor: { username: s.user.username, name: s.user.name, role: s.user.role, csrf: s.csrf } });
+  });
+
+  r.post('/doctor/login', (req, res) => {
+    const username = String(req.body?.username ?? '').trim().slice(0, 60);
+    const lkey = `doctorlogin:${req.ip}:${username.toLowerCase()}`; // only failed attempts count
+    if (limiter.blocked(lkey, 8)) return fail(res, 429, 'too_many');
+    const u = db.prepare("SELECT * FROM staff_users WHERE username = ? AND role = 'pathologist' AND active = 1").get(username);
+    const ok = verifyPassword(String(req.body?.password ?? '').slice(0, 200), u ? u.password_hash : DUMMY_HASH);
+    if (!u || !ok) {
+      limiter.hit(lkey, 8, 15 * 60_000);
+      logAccess(db, { type: 'anonymous', action: 'doctor_login_failed', detail: username.slice(0, 40), req });
+      return fail(res, 401, 'invalid_credentials');
+    }
+    limiter.reset(lkey);
+    sessions.destroy(db, req.cookies.stf);
+    const { token } = sessions.create(db, { kind: 'staff', staffId: u.id });
+    setCookie(res, 'stf', token, { secure });
+    logAccess(db, { type: 'staff', ref: u.username, action: 'doctor_login', req });
+    res.json({ ok: true, doctor: { username: u.username, name: u.name, role: u.role } });
+  });
+
+  r.post('/doctor/logout', requireDoctor, requireDoctorCsrf, (req, res) => {
+    logAccess(db, { type: 'staff', ref: req.doctorSession.user.username, action: 'doctor_logout', req });
+    sessions.destroy(db, req.cookies.stf);
+    clearCookie(res, 'stf', secure);
+    res.json({ ok: true });
+  });
 
   // ---- session probe: what the app shows on load / after a refresh -------------------
   r.get('/session', (req, res) => {
@@ -255,6 +317,234 @@ function apiRoutes(ctx) {
     for (const row of s) summaries.flag(db, row.id, req.session.mobile);
     if (s.length) logAccess(db, { ...who(req.session.mobile), action: 'summary_flagged', orderId: o.id, detail: `result ${rid}`, req });
     res.json({ ok: true });
+  });
+
+  // ---- doctor / lab console (all routes below require a signed-in pathologist) ------
+  r.get('/doctor/orders', requireDoctor, (req, res) => {
+    const orders = db.prepare(`
+      SELECT o.id, o.status, o.referring_doctor, o.collected_at, o.signed_at, o.delivered_at, o.imported_at,
+             p.id AS patient_id, p.name AS patient_name, p.mobile, p.age, p.sex,
+             (SELECT COUNT(*) FROM results r WHERE r.order_id = o.id) AS total_tests,
+             (SELECT COUNT(*) FROM results r WHERE r.order_id = o.id AND r.flag IN ('low', 'high')) AS abnormal_count
+      FROM orders o
+      JOIN patients p ON p.id = o.patient_id
+      ORDER BY CASE WHEN o.status = 'processing' THEN 0 WHEN o.status = 'ready_critical' THEN 1 ELSE 2 END,
+               COALESCE(o.signed_at, o.collected_at, o.imported_at) DESC
+    `).all();
+    res.json({ orders });
+  });
+
+  r.get('/doctor/orders/:id', requireDoctor, (req, res) => {
+    const o = db.prepare(`
+      SELECT o.*, p.name AS patient_name, p.mobile, p.age, p.sex
+      FROM orders o JOIN patients p ON p.id = o.patient_id
+      WHERE o.id = ?
+    `).get(req.params.id);
+    if (!o) return fail(res, 404, 'not_found');
+
+    const raw = db.prepare('SELECT * FROM results WHERE order_id = ? ORDER BY position').all(o.id);
+    const sumByLang = Object.fromEntries(LANGS.map((l) => [l, summaries.forOrder(db, o.id, l)]));
+    const results = raw.map((r2) => {
+      const odd = r2.flag === 'low' || r2.flag === 'high';
+      const localNames = Object.fromEntries(LANGS.map((l) => [l, summaries.localName(r2.name, l) ?? r2.name]));
+      const texts = {};
+      if (odd) {
+        for (const l of LANGS) {
+          const s = sumByLang[l].get(r2.id);
+          texts[l] = s ? { text: s.text, status: s.status, source: s.source, summaryId: s.id } : null;
+        }
+      }
+      return {
+        id: r2.id, name: r2.name, localNames, unit: r2.unit, value: r2.value_raw, valueNum: r2.value_num,
+        flag: r2.flag, refLow: r2.ref_low, refHigh: r2.ref_high, refRaw: r2.ref_raw,
+        summary: odd ? texts : null,
+      };
+    });
+
+    const messages = db.prepare('SELECT * FROM messages WHERE order_id = ? ORDER BY id DESC').all(o.id);
+    const linksList = db.prepare('SELECT * FROM report_links WHERE order_id = ? ORDER BY id DESC').all(o.id);
+    const task = db.prepare('SELECT * FROM tasks WHERE order_id = ?').get(o.id) ?? null;
+
+    res.json({
+      order: o,
+      results,
+      messages,
+      links: linksList,
+      task,
+    });
+  });
+
+  r.post('/doctor/orders/:id/sign-and-send', requireDoctor, requireDoctorCsrf, async (req, res, next) => {
+    try {
+      const orderId = req.params.id;
+      if (!ORDER_ID.test(orderId)) return fail(res, 404, 'not_found');
+      const o = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+      if (!o) return fail(res, 404, 'not_found');
+
+      const now = new Date().toISOString();
+      const targetStatus = req.body?.status === 'ready_critical' ? 'ready_critical' : 'ready';
+      const doctorRef = { id: req.doctorSession.user.id, username: req.doctorSession.user.username };
+
+      if (o.status === 'processing') {
+        db.prepare('UPDATE orders SET status = ?, signed_at = ?, updated_at = ? WHERE id = ?').run(targetStatus, now, now, orderId);
+      } else if (targetStatus !== o.status) {
+        db.prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?').run(targetStatus, now, orderId);
+      }
+
+      const deliveryResult = o.delivered_at
+        ? delivery.resend(ctx, orderId, doctorRef, req)
+        : await delivery.deliverOrder(ctx, orderId);
+
+      logAccess(db, {
+        type: 'staff', ref: doctorRef.username, action: 'doctor_signed_and_sent', orderId,
+        detail: `status=${targetStatus}, channel=${deliveryResult?.attempts?.[0]?.channel || deliveryResult?.channel || 'system'}`, req,
+      });
+
+      const updatedOrder = db.prepare(`SELECT o.*, p.name AS patient_name, p.mobile FROM orders o JOIN patients p ON p.id = o.patient_id WHERE o.id = ?`).get(orderId);
+      const messages = db.prepare('SELECT * FROM messages WHERE order_id = ? ORDER BY id DESC').all(orderId);
+      const latestLink = db.prepare('SELECT id, created_at, expires_at FROM report_links WHERE order_id = ? ORDER BY id DESC LIMIT 1').get(orderId);
+
+      res.json({ ok: true, order: updatedOrder, delivery: deliveryResult, messages, latestLink });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // ---- doctor: broadcast documents (PDF "templates" the doctor keeps, + custom one-off uploads) --
+  r.get('/doctor/documents', requireDoctor, (req, res) => {
+    const docs = db.prepare(`SELECT d.*, (SELECT COUNT(*) FROM broadcast_runs r WHERE r.document_id = d.id) AS runs
+                             FROM broadcast_documents d ORDER BY d.created_at DESC`).all();
+    res.json({ documents: docs });
+  });
+
+  r.post('/doctor/documents', requireDoctor, requireDoctorCsrf, (req, res) => {
+    pdfUpload.single('file')(req, res, (err) => {
+      if (err) return fail(res, 400, err.code === 'LIMIT_FILE_SIZE' ? 'file_too_large' : 'upload_failed');
+      const name = String(req.body?.name ?? '').trim();
+      if (!req.file || !name) return fail(res, 400, 'missing_fields');
+      try {
+        const saved = documents.save(cfg, {
+          buffer: req.file.buffer, originalName: req.file.originalname, name,
+          description: req.body?.description ?? '', createdBy: req.doctorSession.user.username,
+        });
+        const doc = documents.insert(db, cfg, saved);
+        logAccess(db, { type: 'staff', ref: req.doctorSession.user.username, action: 'document_uploaded', detail: doc.name, req });
+        res.json({ ok: true, document: doc });
+      } catch (e) {
+        fail(res, 400, e.code ?? 'bad_file');
+      }
+    });
+  });
+
+  r.delete('/doctor/documents/:id', requireDoctor, requireDoctorCsrf, (req, res) => {
+    const out = documents.remove(db, cfg, Number(req.params.id));
+    if (!out.ok) return fail(res, out.reason === 'not_found' ? 404 : 409, out.reason);
+    logAccess(db, { type: 'staff', ref: req.doctorSession.user.username, action: 'document_deleted', detail: req.params.id, req });
+    res.json({ ok: true });
+  });
+
+  // ---- doctor: broadcast runs (send a document to a list of mobile numbers) -----------------------
+  r.get('/doctor/broadcasts', requireDoctor, (req, res) => {
+    const runs = db.prepare(`SELECT r.*, d.name AS document_name FROM broadcast_runs r
+                             JOIN broadcast_documents d ON d.id = r.document_id ORDER BY r.id DESC LIMIT 100`).all();
+    res.json({ runs });
+  });
+
+  r.get('/doctor/broadcasts/:id', requireDoctor, (req, res) => {
+    const run = db.prepare(`SELECT r.*, d.name AS document_name FROM broadcast_runs r
+                            JOIN broadcast_documents d ON d.id = r.document_id WHERE r.id = ?`).get(Number(req.params.id));
+    if (!run) return fail(res, 404, 'not_found');
+    const recipients = db.prepare('SELECT mobile, send_status, send_channel, send_error, open_count, first_opened_at, expires_at, revoked_at FROM broadcast_links WHERE run_id = ? ORDER BY id').all(run.id)
+      .map((l) => ({ ...l, mobile: maskMobile(l.mobile) }));
+    res.json({ run, recipients });
+  });
+
+  /** Accepts either an existing document_id, or a fresh one-off `file` + `name` to create and send in one step. */
+  r.post('/doctor/broadcast', requireDoctor, requireDoctorCsrf, (req, res, next) => {
+    pdfUpload.single('file')(req, res, (err) => {
+      if (err) return fail(res, 400, err.code === 'LIMIT_FILE_SIZE' ? 'file_too_large' : 'upload_failed');
+      try {
+        let documentId = Number(req.body?.document_id) || null;
+        if (!documentId && req.file) {
+          const name = String(req.body?.name ?? '').trim() || req.file.originalname.replace(/\.pdf$/i, '');
+          const saved = documents.save(cfg, {
+            buffer: req.file.buffer, originalName: req.file.originalname, name,
+            description: req.body?.description ?? '', createdBy: req.doctorSession.user.username,
+          });
+          documentId = documents.insert(db, cfg, saved).id;
+        }
+        if (!documentId) return fail(res, 400, 'missing_document');
+        const result = broadcast.runBroadcast(ctx, {
+          documentId, title: req.body?.title, recipientsText: req.body?.recipients ?? '',
+          createdBy: req.doctorSession.user.username,
+        });
+        res.json({
+          ok: true, run: result.run, document: { id: result.document.id, name: result.document.name },
+          invalidSamples: result.invalidSamples,
+          recipients: result.recipients.map((r2) => ({ ...r2, mobile: maskMobile(r2.mobile) })),
+        });
+      } catch (e) {
+        if (['not_found', 'no_recipients', 'too_many', 'bad_file'].includes(e.code)) return fail(res, 400, e.code, { message: e.message });
+        next(e);
+      }
+    });
+  });
+
+  // ---- public: open a broadcast document link (GET = status only; verify = OTP to the number it was sent to) ---
+  function docLinkOr(req, res) {
+    const found = broadcastLinks.find(db, req.params.token);
+    if (found.state === 'valid') return found;
+    logAccess(db, { type: 'anonymous', action: `doc_link_${found.state}`, req });
+    res.status(found.state === 'expired' ? 410 : 404).json({ error: found.state });
+    return null;
+  }
+
+  r.get('/d/:token', (req, res) => {
+    const f = docLinkOr(req, res);
+    if (!f) return;
+    res.json({ maskedMobile: maskMobile(f.link.mobile), documentName: f.document.name, description: f.document.description });
+  });
+
+  r.post('/d/:token/send', (req, res) => {
+    const f = docLinkOr(req, res);
+    if (!f) return;
+    if (!limiter.hit(`docsend:${req.ip}`, 20, 10 * 60_000).ok) return fail(res, 429, 'too_many');
+    try {
+      const { code } = otp.issue(db, cfg, { mobile: f.link.mobile, purpose: 'doc', linkId: f.link.id });
+      messaging.sendOtp(ctx, { mobile: f.link.mobile, code });
+      logAccess(db, { type: 'anonymous', ref: logMobile(f.link.mobile), action: 'doc_otp_sent', req });
+      res.json({ ok: true, maskedMobile: maskMobile(f.link.mobile), demoCode: demoCode(f.link.mobile) });
+    } catch (e) {
+      if (e instanceof otp.OtpRateLimited) return fail(res, 429, 'wait', { retryAfterSec: e.retryAfterSec });
+      throw e;
+    }
+  });
+
+  r.post('/d/:token/verify', (req, res) => {
+    const f = docLinkOr(req, res);
+    if (!f) return;
+    if (!limiter.hit(`verify:${req.ip}`, 30, 10 * 60_000).ok) return fail(res, 429, 'too_many');
+    const v = otp.verify(db, cfg, { mobile: f.link.mobile, purpose: 'doc', linkId: f.link.id, code: req.body?.code });
+    if (!v.ok) {
+      logAccess(db, { type: 'anonymous', ref: logMobile(f.link.mobile), action: 'otp_failed', detail: `doc:${v.reason}`, req });
+      return fail(res, 401, v.reason);
+    }
+    broadcastLinks.recordOpen(db, f.link.id);
+    logAccess(db, { type: 'anonymous', ref: logMobile(f.link.mobile), action: 'doc_otp_verified', req });
+    // Short-lived, token-bound cookie: proves "OTP just passed for this exact
+    // link", without creating a full patient session for a one-off document.
+    setCookie(res, 'dunlock', sign(cfg.appSecret, { tok: req.params.token }, 10 * 60_000), { maxAgeSec: 600, secure });
+    res.json({ ok: true });
+  });
+
+  r.get('/d/:token/file', (req, res) => {
+    const f = docLinkOr(req, res);
+    if (!f) return;
+    const unlocked = unsign(cfg.appSecret, req.cookies.dunlock);
+    if (!unlocked || unlocked.tok !== req.params.token) return fail(res, 401, 'otp_required');
+    logAccess(db, { type: 'anonymous', ref: logMobile(f.link.mobile), action: 'doc_downloaded', req });
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${f.document.original_name.replace(/["\r\n]/g, '')}"` });
+    res.sendFile(documents.filePath(cfg, f.document));
   });
 
   return r;

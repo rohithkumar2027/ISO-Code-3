@@ -211,3 +211,6 @@ test('OTP codes and link tokens never reach the database in clear text', () => {
 test('health check works', async () => {
   assert.equal((await app.client().get('/healthz')).status, 200);
 });
+
+// The doctor portal and the document-broadcast feature have their own auth
+// and security properties — see test/doctor.test.js.

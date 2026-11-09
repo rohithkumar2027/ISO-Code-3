@@ -69,8 +69,8 @@ CREATE TABLE IF NOT EXISTS report_links (
 CREATE TABLE IF NOT EXISTS otps (
   id          INTEGER PRIMARY KEY,
   mobile      TEXT NOT NULL,
-  purpose     TEXT NOT NULL CHECK (purpose IN ('login','link')),
-  link_id     INTEGER REFERENCES report_links(id),
+  purpose     TEXT NOT NULL CHECK (purpose IN ('login','link','doc')),
+  link_id     INTEGER,          -- opaque per-purpose scope id (report_links.id for 'link', broadcast_links.id for 'doc'); not a single-table FK on purpose
   code_hash   TEXT NOT NULL,
   created_at  TEXT NOT NULL,
   expires_at  TEXT NOT NULL,
@@ -169,3 +169,51 @@ CREATE TABLE IF NOT EXISTS access_log (
 );
 CREATE INDEX IF NOT EXISTS idx_access_at ON access_log (at);
 CREATE INDEX IF NOT EXISTS idx_access_order ON access_log (order_id);
+
+-- Doctor-portal document broadcast: a doctor sends one uploaded PDF (a
+-- "document", not a patient order/report) to a list of mobile numbers. Kept
+-- as its own table set, separate from orders/report_links, so this new
+-- feature cannot touch the already-hardened report-delivery path.
+CREATE TABLE IF NOT EXISTS broadcast_documents (
+  id            INTEGER PRIMARY KEY,
+  name          TEXT NOT NULL,
+  description   TEXT,
+  filename      TEXT NOT NULL,            -- on disk, under data/documents/
+  original_name TEXT NOT NULL,
+  size          INTEGER NOT NULL,
+  created_by    TEXT NOT NULL,            -- staff username
+  created_at    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS broadcast_runs (
+  id           INTEGER PRIMARY KEY,
+  document_id  INTEGER NOT NULL REFERENCES broadcast_documents(id) ON DELETE CASCADE,
+  title        TEXT,
+  created_by   TEXT NOT NULL,
+  created_at   TEXT NOT NULL,
+  total        INTEGER NOT NULL DEFAULT 0,
+  sent         INTEGER NOT NULL DEFAULT 0,
+  failed       INTEGER NOT NULL DEFAULT 0,
+  invalid      INTEGER NOT NULL DEFAULT 0,
+  duplicate    INTEGER NOT NULL DEFAULT 0
+);
+
+-- One row per recipient: a 72h expiring, OTP-gated link to view the document,
+-- the same pattern as report_links, never storing the raw token.
+CREATE TABLE IF NOT EXISTS broadcast_links (
+  id              INTEGER PRIMARY KEY,
+  run_id          INTEGER NOT NULL REFERENCES broadcast_runs(id) ON DELETE CASCADE,
+  document_id     INTEGER NOT NULL REFERENCES broadcast_documents(id) ON DELETE CASCADE,
+  mobile          TEXT NOT NULL,
+  token_hash      TEXT NOT NULL UNIQUE,
+  created_at      TEXT NOT NULL,
+  expires_at      TEXT NOT NULL,
+  revoked_at      TEXT,
+  open_count      INTEGER NOT NULL DEFAULT 0,
+  first_opened_at TEXT,
+  send_status     TEXT NOT NULL CHECK (send_status IN ('sent','failed')),
+  send_channel    TEXT,
+  send_error      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_broadcast_links_run ON broadcast_links (run_id);
+CREATE INDEX IF NOT EXISTS idx_broadcast_links_mobile ON broadcast_links (mobile);

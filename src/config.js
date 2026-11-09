@@ -51,6 +51,9 @@ function build(overrides = {}) {
     staffMaxMs: 10 * 3600 * 1000,
     consentVersion: '2026-01',
     maxCsvBytes: 2 * 1024 * 1024,
+    maxPdfBytes: 8 * 1024 * 1024,
+    maxBroadcastRecipients: 2000,
+    documentsDir: overrides.documentsDir ?? env.DOCUMENTS_DIR ?? path.join(root, 'data', 'documents'),
     deliveryReceiptDelayMs: overrides.deliveryReceiptDelayMs ?? 3000,
     ai: {
       key: overrides.aiKey ?? env.ANTHROPIC_API_KEY ?? '',

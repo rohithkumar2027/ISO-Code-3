@@ -5,6 +5,8 @@ node_modules/
 data/*.db
 data/*.db-*
 lis-export/
+lis-export-preview/
+data/documents/
 .claude/
 *.log
 web/dist/

@@ -1,6 +1,7 @@
 // Small fetch wrapper. Cookies (session, pending-login, language) are set
 // HttpOnly by the server; this file never touches them directly. Mutating
-// calls carry the CSRF token the server handed out in /api/session.
+// calls carry the CSRF token the server handed out in /api/session or
+// /api/doctor/session.
 const BASE = '/api';
 
 class ApiError extends Error {
@@ -12,6 +13,13 @@ class ApiError extends Error {
   }
 }
 
+async function handle(res) {
+  let data = null;
+  try { data = await res.json(); } catch { /* empty body, e.g. some 204s */ }
+  if (!res.ok) throw new ApiError(res.status, data?.error ?? 'server_error', data);
+  return data;
+}
+
 async function request(path, { method = 'GET', body, csrf } = {}) {
   const headers = {};
   if (body !== undefined) headers['content-type'] = 'application/json';
@@ -20,10 +28,15 @@ async function request(path, { method = 'GET', body, csrf } = {}) {
     method, headers, credentials: 'same-origin',
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
-  let data = null;
-  try { data = await res.json(); } catch { /* empty body, e.g. some 204s */ }
-  if (!res.ok) throw new ApiError(res.status, data?.error ?? 'server_error', data);
-  return data;
+  return handle(res);
+}
+
+/** For file uploads: pass a FormData body as-is (the browser sets the multipart boundary). */
+async function requestForm(path, { method = 'POST', form, csrf } = {}) {
+  const headers = {};
+  if (csrf) headers['x-csrf-token'] = csrf;
+  const res = await fetch(BASE + path, { method, headers, credentials: 'same-origin', body: form });
+  return handle(res);
 }
 
 export const api = {
@@ -40,7 +53,29 @@ export const api = {
   link: (token) => request(`/links/${token}`),
   linkSend: (token) => request(`/links/${token}/send`, { method: 'POST', body: {} }),
   linkVerify: (token, code) => request(`/links/${token}/verify`, { method: 'POST', body: { code } }),
+
+  // Doctor portal (requires a real pathologist session, cookie "stf")
+  doctorSession: () => request('/doctor/session'),
+  doctorLogin: (username, password) => request('/doctor/login', { method: 'POST', body: { username, password } }),
+  doctorLogout: (csrf) => request('/doctor/logout', { method: 'POST', body: {}, csrf }),
+  doctorOrders: () => request('/doctor/orders'),
+  doctorOrder: (id) => request(`/doctor/orders/${id}`),
+  doctorSignAndSend: (id, data, csrf) => request(`/doctor/orders/${id}/sign-and-send`, { method: 'POST', body: data, csrf }),
+
+  // Document broadcast: upload a PDF, send it as a secure OTP-gated link to a list of numbers
+  doctorDocuments: () => request('/doctor/documents'),
+  doctorUploadDocument: (form, csrf) => requestForm('/doctor/documents', { form, csrf }),
+  doctorDeleteDocument: (id, csrf) => request(`/doctor/documents/${id}`, { method: 'DELETE', body: {}, csrf }),
+  doctorBroadcasts: () => request('/doctor/broadcasts'),
+  doctorBroadcast: (id) => request(`/doctor/broadcasts/${id}`),
+  doctorSendBroadcast: (form, csrf) => requestForm('/doctor/broadcast', { form, csrf }),
+
+  // Patient-facing: opening a broadcast document link
+  docLink: (token) => request(`/d/${token}`),
+  docLinkSend: (token) => request(`/d/${token}/send`, { method: 'POST', body: {} }),
+  docLinkVerify: (token, code) => request(`/d/${token}/verify`, { method: 'POST', body: { code } }),
 };
 
 export { ApiError };
 export const reportPdfUrl = (id) => `/api/reports/${id}/pdf`;
+export const docFileUrl = (token) => `/api/d/${token}/file`;

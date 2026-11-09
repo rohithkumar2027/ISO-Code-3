@@ -15,7 +15,8 @@ const sample = (f) => fs.readFileSync(path.join(__dirname, '..', 'data', 'sample
 
 async function startApp({ files = ['lis-export-1.csv'], ai = null, cfgOver = {} } = {}) {
   const exportDir = fs.mkdtempSync(path.join(os.tmpdir(), 'exp-'));
-  const cfg = build({ appSecret: 'z'.repeat(64), dbFile: ':memory:', baseUrl: 'http://127.0.0.1', otpResendCooldownMs: 0, deliveryReceiptDelayMs: 0, exportDir, demo: false, ...cfgOver });
+  const documentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'docs-'));
+  const cfg = build({ appSecret: 'z'.repeat(64), dbFile: ':memory:', baseUrl: 'http://127.0.0.1', otpResendCooldownMs: 0, deliveryReceiptDelayMs: 0, exportDir, documentsDir, demo: false, ...cfgOver });
   const db = open(':memory:');
   const provider = new MockProvider({ receiptDelayMs: 0 });
   const ctx = createContext({ cfg, db, provider, ai });
@@ -35,7 +36,11 @@ async function startApp({ files = ['lis-export-1.csv'], ai = null, cfgOver = {} 
   return {
     ctx, base, db, provider,
     client: () => client(base),
-    close: () => new Promise((ok) => server.close(() => { fs.rmSync(exportDir, { recursive: true, force: true }); ok(); })),
+    close: () => new Promise((ok) => server.close(() => {
+      fs.rmSync(exportDir, { recursive: true, force: true });
+      fs.rmSync(documentsDir, { recursive: true, force: true });
+      ok();
+    })),
   };
 }
 
@@ -77,9 +82,16 @@ function client(base) {
     return { status: res.status, headers: res.headers, json };
   };
   const getJson = async (u, o) => { const r = await send('GET', u, o); return { ...r, json: r.text ? JSON.parse(r.text) : null }; };
+  const deleteJson = async (u, { csrf, headers = {} } = {}) => {
+    const h = { ...headers };
+    if (csrf) h['x-csrf-token'] = csrf;
+    const r = await send('DELETE', u, { headers: h });
+    return { ...r, json: r.text ? JSON.parse(r.text) : null };
+  };
   return {
     get: (u, o) => send('GET', u, o),
     getJson,
+    deleteJson,
     post: (u, body, o = {}) => send('POST', u, { ...o, body }),
     postForm: (u, form, o = {}) => send('POST', u, { ...o, body: form }),
     postJson,
@@ -103,4 +115,12 @@ async function loginPatient(app, c, mobile = '9000000001', { consent = true } = 
   return r;
 }
 
-module.exports = { startApp, client, csrfFrom, tokenFromBody, loginPatient, sample };
+/** Log a staff member in as doctor (pathologist) via the JSON API; returns their csrf token. */
+async function loginDoctor(c, username = 'path', password = 'test-pass-1') {
+  const r = await c.postJson('/api/doctor/login', { username, password });
+  if (!r.json?.ok) return r;
+  const s = await c.getJson('/api/doctor/session');
+  return { ...r, csrf: s.json?.doctor?.csrf };
+}
+
+module.exports = { startApp, client, csrfFrom, tokenFromBody, loginPatient, loginDoctor, sample };
