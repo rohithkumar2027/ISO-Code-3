@@ -1,42 +1,66 @@
-/* Design tokens — warm editorial palette.
-   No webfonts: the brief's "weak data" constraint still holds, so the oversized,
-   editorial feel comes from the type SCALE, generous leading and system serif
-   stacks (which already cover Telugu/Hindi on Android, iOS, Windows and macOS)
-   rather than a downloaded font file. */
+/* Design tokens — Clinical Pharmacy & Diagnostics Palette with Light & Dark Mode */
+
 :root {
-  --ivory: #fbf7ef;
-  --ivory-deep: #f4ecdd;
+  --ivory: #f8faf8;
+  --ivory-deep: #f0f4f1;
   --paper: #ffffff;
-  --ink: #1c2420;
-  --ink-soft: #4b564e;
-  --line: #e7ddc9;
+  --ink: #111e17;
+  --ink-soft: #475b51;
+  --line: #e2eade;
 
-  --forest: #1b3b2f;
-  --forest-deep: #112820;
-  --forest-soft: #2f5d46;
-  --forest-tint: #e8efe7;
-  --forest-tint-2: #dce9e0;
+  --forest: #0f766e;        /* Modern clinical teal/emerald pharmacy green */
+  --forest-deep: #042f2e;   /* Deep clinical green */
+  --forest-soft: #14b8a6;   /* Bright medical teal */
+  --forest-tint: #ecfdf5;   /* Very light mint */
+  --forest-tint-2: #d1fae5;
 
-  --gold: #a9802f;
-  --rust: #8c3a2b;
-  --rust-tint: #f6e7e2;
-  --ochre: #92701f;
-  --ochre-tint: #f6eed9;
+  --pharmacy-cross: #10b981;/* Vibrant pharmacy cross emerald */
+  --pharmacy-blue: #0284c7; /* Clinical diagnostic cyan/blue */
 
-  --radius-lg: 28px;
-  --radius-md: 20px;
-  --radius-sm: 12px;
-  --shadow-1: 0 1px 2px rgba(27, 59, 47, 0.06), 0 8px 24px -12px rgba(27, 59, 47, 0.18);
-  --shadow-2: 0 2px 6px rgba(27, 59, 47, 0.08), 0 20px 48px -16px rgba(27, 59, 47, 0.28);
+  --gold: #d97706;
+  --rust: #dc2626;
+  --rust-tint: #fef2f2;
+  --ochre: #b45309;
+  --ochre-tint: #fffbeb;
 
-  --serif: Georgia, 'Iowan Old Style', 'Noto Serif', 'Noto Serif Telugu', 'Noto Serif Devanagari', 'Times New Roman', serif;
-  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', 'Noto Sans Telugu', 'Noto Sans Devanagari', 'Nirmala UI', sans-serif;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 8px;
+  --shadow-1: 0 1px 3px rgba(15, 118, 110, 0.08), 0 6px 16px -4px rgba(15, 118, 110, 0.12);
+  --shadow-2: 0 4px 12px rgba(15, 118, 110, 0.1), 0 16px 36px -8px rgba(15, 118, 110, 0.18);
 
-  --container: 760px;
-  --gutter: clamp(20px, 6vw, 56px);
+  --serif: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', 'Noto Sans Telugu', 'Noto Sans Devanagari', sans-serif;
+
+  --container: 860px;
+  --gutter: clamp(16px, 4vw, 36px);
+  --transition-theme: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
 }
 
-/* Deliberately no prefers-color-scheme dark mode: the brief's identity is
-   this warm ivory/forest palette specifically, and most of this app's
-   readers are elderly patients on small phones, where a surprise theme
-   swap costs more in legibility than it gains. The design stays light. */
+/* Dark Mode Theme Tokens */
+[data-theme='dark'] {
+  --ivory: #0b1310;
+  --ivory-deep: #121f1a;
+  --paper: #16241e;
+  --ink: #f0fdf4;
+  --ink-soft: #94a89d;
+  --line: #22372c;
+
+  --forest: #10b981;
+  --forest-deep: #059669;
+  --forest-soft: #34d399;
+  --forest-tint: rgba(16, 185, 129, 0.15);
+  --forest-tint-2: rgba(16, 185, 129, 0.25);
+
+  --pharmacy-cross: #34d399;
+  --pharmacy-blue: #38bdf8;
+
+  --gold: #fbbf24;
+  --rust: #f87171;
+  --rust-tint: rgba(239, 68, 68, 0.18);
+  --ochre: #f59e0b;
+  --ochre-tint: rgba(245, 158, 11, 0.16);
+
+  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 8px 28px rgba(0, 0, 0, 0.6);
+}

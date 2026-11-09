@@ -1,0 +1,140 @@
+/* Doctor Login Styles */
+
+.doctor-login-card {
+  background: var(--paper);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 32px 28px;
+  box-shadow: var(--shadow-2);
+  text-align: center;
+}
+
+.doctor-login-icon {
+  width: 64px;
+  height: 64px;
+  background: #0f766e;
+  color: #ffffff;
+  border-radius: 50%;
+  font-size: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  box-shadow: 0 4px 16px rgba(15, 118, 110, 0.25);
+}
+
+.doctor-portal-tag {
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  color: #0f766e;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.doctor-login-title {
+  font-size: 1.7rem;
+  color: var(--forest-deep);
+  margin-bottom: 8px;
+}
+
+.doctor-login-sub {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin-bottom: 24px;
+}
+
+.doctor-login-form {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.form-group label {
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.doctor-submit-btn {
+  background: #0f766e;
+  min-height: 52px;
+  font-size: 1.02rem;
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+.doctor-submit-btn:hover {
+  background: #042f2e;
+}
+
+/* Quick Doctor Section */
+.quick-doctor-section {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+  margin-bottom: 20px;
+}
+
+.quick-title {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.quick-buttons-row {
+  display: flex;
+  gap: 10px;
+  flex-direction: column;
+}
+
+.quick-doc-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--ivory-deep);
+  border: 1px solid var(--line);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--forest-deep);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.quick-doc-btn:hover {
+  background: var(--forest-tint);
+  border-color: var(--forest-tint-2);
+}
+
+/* Switch Portal */
+.switch-portal-box {
+  background: var(--ivory-deep);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.switch-portal-link {
+  color: var(--forest);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.doctor-demo-hint {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  text-align: center;
+  margin: 18px 0 14px;
+}
+
